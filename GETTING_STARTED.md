@@ -10,7 +10,7 @@
 * [DVM](https://github.com/nowsyn/DVM)
 
 ### Composited Testing Set
-* [Google Drive]()
+* [Google Drive](https://drive.google.com/file/d/1EPnwlVU1NSccubO1W1AuutyDad_0X2mo/view?usp=sharing)
 
 ## Training
 
