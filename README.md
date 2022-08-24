@@ -2,7 +2,7 @@
 
 [Jiachen Li](https://chrisjuniorli.github.io/), [Vidit Goel](https://vidit98.github.io/), Marianna Ohanyan, Shant Navasardyan, [Yunchao Wei](https://weiyc.github.io/), [Humphrey Shi](https://www.humphreyshi.com/)
 
-[[`arXiv`]()] [[`Project`](https://chrisjuniorli.github.io/project/VMFormer/)] [[`Code`]()]
+[[`arXiv`]()] [[`Project`](https://chrisjuniorli.github.io/project/VMFormer/)] [[`Code`](https://github.com/SHI-Labs/VMFormer)]
 
 <div align="center">
   <img src="figures/fig1_arxiv.png" width="100%" height="100%"/>
@@ -10,7 +10,7 @@
 
 ## News
 
-Aug 25, 2022: [Codes]() are released with [project page](https://chrisjuniorli.github.io/project/VMFormer/) and [arxiv version]().
+Aug 25, 2022: [Codes](https://github.com/SHI-Labs/VMFormer) are released with [project page](https://chrisjuniorli.github.io/project/VMFormer/) and [arxiv version]().
 
 ## Abstract
 
