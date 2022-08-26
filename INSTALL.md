@@ -2,13 +2,13 @@
 
 Step 1: Clone this repo
 ```bash
-git clone https://github.com/
+git clone https://github.com/SHI-Labs/VMFormer
 ```
 
 Step 2: Create conda environment
 ```bash
-conda create --name vmformr python=3.7
-conda activate vmformr
+conda create --name vmformer python=3.7
+conda activate vmformer
 ```
 
 Step 3: Install pytorch and torchvision
