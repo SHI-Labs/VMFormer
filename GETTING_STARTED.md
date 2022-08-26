@@ -25,7 +25,7 @@ GPUS_PER_NODE=8 ./tools/run_dist_launch.sh 8 ./configs/mv3_vmformer.sh
 Evaluating on the composited testing set with 200 video clips:
 
 ```
-CUDA_VISIBLE_DEVICES=0 python inference_vm.py --model_path path/to/model_weights --masks --num_frames 20 --img_path path/to/testing_sets
+CUDA_VISIBLE_DEVICES=0 python inference_vm.py --model_path path/to/model_weights --masks --num_frames 20 --img_path path/to/testing_sets --query_temporal weight_sum --fpn_temporal
 ```
 
 
