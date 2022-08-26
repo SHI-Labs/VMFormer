@@ -12,6 +12,8 @@
 ### Composited Testing Set
 * [Google Drive](https://drive.google.com/file/d/1EPnwlVU1NSccubO1W1AuutyDad_0X2mo/view?usp=sharing)
 
+The way the data are composited following [RVM practice](https://github.com/PeterL1n/RobustVideoMatting/blob/master/documentation/training.md).
+
 ## Training
 
 We conducted all experiments on 8xA6000 GPUs. To train VMFormer with 8 GPUs, run:
