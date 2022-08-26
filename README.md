@@ -5,7 +5,7 @@
 [[`arXiv`]()] [[`Project`](https://chrisjuniorli.github.io/project/VMFormer/)] [[`Code`](https://github.com/SHI-Labs/VMFormer)]
 
 <div align="center">
-  <img src="figures/fig1_arxiv.png" width="100%" height="100%"/>
+  <img src="figures/fig1_arxiv_final.png" width="100%" height="100%"/>
 </div><br/>
 
 ## News
@@ -14,12 +14,13 @@ Aug 25, 2022: [Codes](https://github.com/SHI-Labs/VMFormer) are released with [p
 
 ## Abstract
 
-Video matting, which is to estimate alpha mattes for each frame of input video sequences. Solutions to video matting have been dominated by deep convolutional neural networks for the past few years, which has become the de-facto standard for both academia and industry. However, they still suffer from the inductive bias of CNN on local perception and the lack of long-range temporal modeling. In this paper, we propose <b>VMFormer</b>: a transformer-based end-to-end method that makes predictions on alpha mattes of each corresponding frame from learnable queries given a video input sequence. It leverages self-attention in the transformer encoder to build global integration of feature sequences and queries to learn global representations through cross-attention in the transformer decoder. We further apply long-range temporal modeling to all queries along with short-range temporal modeling on feature maps. Each query predicts alpha matte based on feature maps of each frame in the prediction stage. Experiments show that VMFormer outperforms previous CNN-based video matting methods and sets a new state-of-the-art. To our best knowledge, it is the first end-to-end video matting solution built upon a vision transformer with predictions on learnable queries.
+Video matting aims to predict the alpha mattes for each frame from a given input video sequence. Recent solutions to video matting have been dominated by deep convolutional neural networks (CNN) for the past few years, which have become the de-facto standard for both academia and industry. 
+However, they have inbuilt inductive bias of locality and do not capture global characteristics of an image due to the CNN-based architectures. They also lack long range temporal modeling considering computational costs when dealing with feature maps of multiple frames. In this paper, we propose <b>VMFormer</b>: a transformer-based end-to-end method for video matting. It makes predictions on alpha mattes of each frame from learnable queries given a video input sequence. Specifically, it leverages self-attention layers to build global integration of feature sequences with short-range temporal modeling on successive frames. We further apply queries to learn global representations through cross-attention in the transformer decoder with long-range temporal modeling upon all queries. In the prediction stage, both queries and corresponding feature maps are used to make the final prediction of alpha matte. Experiments show that VMFormer outperforms previous CNN-based video matting methods on the composited benchmarks. To our best knowledge, it is the first end-to-end video matting solution built upon a full vision transformer with predictions on the learnable queries.
 
 ## Architecture
 
 <div align="center">
-  <img src="figures/fig2_arxiv_v2.png" width="100%" height="100%"/>
+  <img src="figures/fig2_arxiv.png" width="100%" height="100%"/>
 </div><br/>
 
 VMFormer contains two separate paths for modeling of features and queries: a) The feature modeling path contains a CNN-based backbone network to extract feature pyramids and a transformer encoder integrates feature sequences globally with short-range feature-based temporal modeling (SFTM). b) The query modeling path has a transformer decoder for queries to learn global representations of feature sequences and long-range query-based temporal modeling (LQTM) are built upon all queries. The final alpha mattes predictions based on matrix multiplication between queries and feature maps. LayerNorm, residual connection and repeated blocks are omitted for simplicity.
