@@ -35,7 +35,7 @@ Visualization of alpha matte predictions from MODNet, RVM and VMFormer under cha
 
 ## Installation
 
-See [Installation instructions](INSTALL.md).
+See [Installation Instructions](INSTALL.md).
 
 ## Getting Started
 
