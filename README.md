@@ -48,6 +48,7 @@ See [Getting Started](GETTING_STARTED.md).
 
 # To do List
 - [x] PyTorch codes release
+- [ ] Video inference support
 - [ ] Huggingface demo
 - [ ] Colab demo
 
