@@ -9,7 +9,7 @@ python -u main_vm.py \
     --lr_drop 18 30 \
     --batch_size 2 \
     --num_workers 2 \
-    --vm_path ../data/Matting/ \
+    --vm_path /home/jiachenl/data/Matting/ \
     --num_queries 1 \
     --num_frames 5 \
     --backbone mv3 \

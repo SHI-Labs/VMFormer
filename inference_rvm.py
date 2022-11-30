@@ -159,16 +159,20 @@ def main(args):
 
         root_folder = args.img_path
         clip_paths = []
-        
-        for clip in sorted(os.listdir(root_folder)):
-            clip_path = os.path.join(root_folder, clip)
-            clip_paths.append(clip_path)
+
+        for dataset in sorted(os.listdir(root_folder)):
+            if os.path.isdir(os.path.join(root_folder, dataset)):
+                dataset_path = os.path.join(root_folder, dataset)
+                for clip in sorted(os.listdir(dataset_path)):
+                    clip_path = os.path.join(dataset_path, clip)
+                    clip_paths.append(clip_path)
 
         for single_clip_path in clip_paths:
             pha_mad = []
             pha_mse = []
             pha_grad = []
             pha_conn = []
+            pha_dtssd = []
             print('processing %s\n'%(single_clip_path))
             files = []
             single_clip_path_com = os.path.join(single_clip_path,'com')
@@ -191,6 +195,11 @@ def main(args):
                     for (j,mask) in enumerate(outputs):
                         mask = F.interpolate(mask, (img.shape[-2], img.shape[-1]), mode="bilinear", align_corners=False)
                         pred_pha = mask[0][0].sigmoid().cpu().detach().numpy().astype(np.float32)
+                        #### to make fair comparisons to RVM's evaluation script
+                        pred_pha = pred_pha * 255
+                        pred_pha = pred_pha.astype(np.uint8)
+                        pred_pha = pred_pha / 255
+                        #### 
                         pha_gt_file = files[img_index_set[j]].replace('com','pha')
                         true_pha = cv2.imread(pha_gt_file, cv2.IMREAD_GRAYSCALE).astype(np.float32) / 255
                         pha_mad.append(mad(pred_pha, true_pha))
@@ -199,7 +208,7 @@ def main(args):
                         pha_conn.append(conn(pred_pha, true_pha))
                     img_set = []
                     img_index_set = []
-
+            
             print('pha_mad:%.2f\n'%(np.mean(pha_mad)))
             print('pha_mse:%.2f\n'%(np.mean(pha_mse)))
             print('pha_grad:%.2f\n'%(np.mean(pha_grad)))
@@ -307,7 +316,8 @@ class MetricCONN:
         connectivity_error = np.sum(np.abs(true_phi - pred_phi))
         return connectivity_error / 1000
 
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser('VMFormer inference script', parents=[get_args_parser()])
+    parser = argparse.ArgumentParser('VMFormer inference script on RVM test set', parents=[get_args_parser()])
     args = parser.parse_args()
     main(args)

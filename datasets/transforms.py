@@ -1,10 +1,18 @@
 # ------------------------------------------------------------------------
 # Transforms and data augmentation for sequence level images, bboxes and masks.
 # ------------------------------------------------------------------------
-# Modified from Deformable VisTR (https://github.com/Epiphqny/VisTR)
+# Modified from RVM (https://github.com/PeterL1n/RobustVideoMatting)
+# Copyright (c) 2021 ByteDance Inc. All Rights Reserved.
+# ------------------------------------------------------------------------
+# Modified from SeqFormer (https://github.com/wjf5203/SeqFormer)
+# Copyright (c) 2021 Junfeng Wu. All Rights Reserved.
+# ------------------------------------------------------------------------
+# Modified from Deformable DETR (https://github.com/fundamentalvision/Deformable-DETR)
+# Copyright (c) 2020 SenseTime. All Rights Reserved.
 # ------------------------------------------------------------------------
 
 import random
+import easing_functions as ef
 
 import PIL
 import torch
@@ -17,6 +25,51 @@ import numpy as np
 from numpy import random as rand
 from PIL import Image
 import cv2
+
+def random_easing_fn():
+    if random.random() < 0.2:
+        return ef.LinearInOut()
+    else:
+        return random.choice([
+            ef.BackEaseIn,
+            ef.BackEaseOut,
+            ef.BackEaseInOut,
+            ef.BounceEaseIn,
+            ef.BounceEaseOut,
+            ef.BounceEaseInOut,
+            ef.CircularEaseIn,
+            ef.CircularEaseOut,
+            ef.CircularEaseInOut,
+            ef.CubicEaseIn,
+            ef.CubicEaseOut,
+            ef.CubicEaseInOut,
+            ef.ExponentialEaseIn,
+            ef.ExponentialEaseOut,
+            ef.ExponentialEaseInOut,
+            ef.ElasticEaseIn,
+            ef.ElasticEaseOut,
+            ef.ElasticEaseInOut,
+            ef.QuadEaseIn,
+            ef.QuadEaseOut,
+            ef.QuadEaseInOut,
+            ef.QuarticEaseIn,
+            ef.QuarticEaseOut,
+            ef.QuarticEaseInOut,
+            ef.QuinticEaseIn,
+            ef.QuinticEaseOut,
+            ef.QuinticEaseInOut,
+            ef.SineEaseIn,
+            ef.SineEaseOut,
+            ef.SineEaseInOut,
+            Step,
+        ])()
+
+class Step:
+    def __call__(self, value):
+        return 0 if value < 0.5 else 1
+
+def lerp(a, b, percentage):
+    return a * (1 - percentage) + b * percentage
 
 def crop(fgrs, phas, bgrs, region):
     cropped_fgrs = []
@@ -123,7 +176,7 @@ class RandomSizeCrop(object):
         self.min_size = min_size
         self.max_size = max_size
 
-    def __call__(self, fgrs, phas, bgrs, now_frames):
+    def __call__(self, fgrs, phas, bgrs):
         w = random.randint(self.min_size, min(fgrs[0].width, self.max_size))
         h = random.randint(self.min_size, min(fgrs[0].height, self.max_size))
         region = T.RandomCrop.get_params(fgrs[0], [h, w])
@@ -147,7 +200,7 @@ class RandomContrast(object):
         self.upper = upper
         assert self.upper >= self.lower, "contrast upper must be >= lower."
         assert self.lower >= 0, "contrast lower must be non-negative."
-    def __call__(self, fgr, pha, bgr, now_frames):
+    def __call__(self, fgr, pha, bgr):
         
         if rand.randint(2):
             alpha = rand.uniform(self.lower, self.upper)
@@ -174,7 +227,7 @@ class RandomSaturation(object):
         assert self.upper >= self.lower, "contrast upper must be >= lower."
         assert self.lower >= 0, "contrast lower must be non-negative."
 
-    def __call__(self, fgr, pha, bgr, now_frames):
+    def __call__(self, fgr, pha, bgr):
         if rand.randint(2):
             fgr[:, :, 1] *= rand.uniform(self.lower, self.upper)
             bgr[:, :, 1] *= rand.uniform(self.lower, self.upper)
@@ -185,7 +238,7 @@ class RandomHue(object): #
         assert delta >= 0.0 and delta <= 360.0
         self.delta = delta
 
-    def __call__(self, fgr, pha, bgr, now_frames):
+    def __call__(self, fgr, pha, bgr):
         if rand.randint(2):
             fgr[:, :, 0] += rand.uniform(-self.delta, self.delta)
             fgr[:, :, 0][fgr[:, :, 0] > 360.0] -= 360.0
@@ -212,7 +265,7 @@ class ConvertColor(object):
         self.transform = transform
         self.current = current
 
-    def __call__(self, fgr, pha, bgr, now_frames):
+    def __call__(self, fgr, pha, bgr):
         if self.current == 'BGR' and self.transform == 'HSV':
             fgr = cv2.cvtColor(fgr, cv2.COLOR_BGR2HSV)
             bgr = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
@@ -244,7 +297,7 @@ class PhotometricDistort(object):
         self.rand_brightness = RandomBrightness()
         self.rand_light_noise = RandomLightingNoise()
     
-    def __call__(self, fgrs, phas, bgrs, now_frames):
+    def __call__(self, fgrs, phas, bgrs):
         fgrs_new = []
         phas_new = []
         bgrs_new = []
@@ -257,7 +310,7 @@ class PhotometricDistort(object):
                 distort = Compose(self.pd[:-1])
             else:
                 distort = Compose(self.pd[1:])
-            fgr, pha, bgr = distort(fgr, pha, bgr, now_frames)
+            fgr, pha, bgr = distort(fgr, pha, bgr)
             fgr, pha, bgr = self.rand_light_noise(fgr, pha, bgr)
             fgrs_new.append(Image.fromarray(fgr.astype('uint8')))
             phas_new.append(Image.fromarray(pha.astype('uint8')))
@@ -298,7 +351,7 @@ class RandomHorizontalFlip(object):
     def __init__(self, p=0.5):
         self.p = p
 
-    def __call__(self, fgrs, phas, bgrs, now_frames):
+    def __call__(self, fgrs, phas, bgrs):
         if random.random() < self.p:
             return hflip(fgrs, phas, bgrs)
         return fgrs, phas, bgrs
@@ -319,7 +372,7 @@ class RandomResize(object):
         self.sizes = sizes
         self.max_size = max_size
 
-    def __call__(self, fgrs, phas, bgrs, now_frames=None):
+    def __call__(self, fgrs, phas, bgrs):
         size = random.choice(self.sizes)
         return resize(fgrs, phas, bgrs, size, self.max_size)
 
@@ -333,6 +386,70 @@ class RandomPad(object):
         pad_y = random.randint(0, self.max_pad)
         return pad(fgrs, phas, bgrs, (pad_x, pad_y))
 
+class MotionPause(object):
+    def __init__(self, prob=0.1):
+        self.prob = prob
+
+    def __call__(self, *imgs):
+        if random.random() < self.prob:
+            frames = len(imgs[0])
+            pause_frame = random.choice(range(frames - 1))
+            pause_length = random.choice(range(frames - pause_frame))
+            for img in imgs:
+                img[pause_frame + 1 : pause_frame + pause_length] = img[pause_frame]
+            return imgs
+        else:
+            return imgs
+
+class MotionBlur(object):
+    def __init__(self, prob=0.1):
+        self.prob = prob
+
+    def __call__(self, *imgs):
+        if random.random() < self.prob:
+            blurA = random.random() * 10
+            blurB = random.random() * 10
+
+            frames = len(imgs[0])
+            easing = random_easing_fn()
+            for t in range(frames):
+                percentage = easing(t / (frames - 1))
+                blur = max(lerp(blurA, blurB, percentage), 0)
+                if blur != 0:
+                    kernel_size = int(blur * 2)
+                    if kernel_size % 2 == 0:
+                        kernel_size += 1
+                    for img in imgs:
+                        img[t] = F.gaussian_blur(img[t], kernel_size, sigma=blur)
+            return imgs
+        else:
+            return imgs
+
+class RandomMotionAffine(object):
+    def __init__(self, prob=0.5):
+        self.prob = prob
+
+    def __call__(self, *imgs):
+        if random.random() < self.prob:
+            config = dict(degrees=(-10, 10), translate=(0.1, 0.1),
+                      scale_ranges=(0.9, 1.1), shears=(-5, 5), img_size=imgs[0][0].size)
+            angleA, (transXA, transYA), scaleA, (shearXA, shearYA) = T.RandomAffine.get_params(**config)
+            angleB, (transXB, transYB), scaleB, (shearXB, shearYB) = T.RandomAffine.get_params(**config)
+            frames = len(imgs[0])
+            easing = random_easing_fn()
+            for t in range(frames):
+                percentage = easing(t / (frames - 1))
+                angle = lerp(angleA, angleB, percentage)
+                transX = lerp(transXA, transXB, percentage)
+                transY = lerp(transYA, transYB, percentage)
+                scale = lerp(scaleA, scaleB, percentage)
+                shearX = lerp(shearXA, shearXB, percentage)
+                shearY = lerp(shearYA, shearYB, percentage)
+                for img in imgs:
+                    img[t] = F.affine(img[t], angle, (transX, transY), scale, (shearX, shearY), F.InterpolationMode.BILINEAR)
+            return imgs
+        else:
+            return imgs
 
 class RandomSelect(object):
     """
@@ -344,14 +461,14 @@ class RandomSelect(object):
         self.transforms2 = transforms2
         self.p = p
 
-    def __call__(self, fgrs, phas, bgrs, now_frames):
+    def __call__(self, fgrs, phas, bgrs):
         if random.random() < self.p:
-            return self.transforms1(fgrs, phas, bgrs, now_frames)
-        return self.transforms2(fgrs, phas, bgrs, now_frames)
+            return self.transforms1(fgrs, phas, bgrs)
+        return self.transforms2(fgrs, phas, bgrs)
 
 
 class ToTensor(object):
-    def __call__(self, fgrs, phas, bgrs, now_frames):
+    def __call__(self, fgrs, phas, bgrs):
         fgrs_new = []
         phas_new = []
         bgrs_new = []
@@ -375,7 +492,7 @@ class Normalize(object):
         self.mean = mean
         self.std = std
 
-    def __call__(self, fgrs, phas, bgrs, now_frames=None):
+    def __call__(self, fgrs, phas, bgrs):
         fgrs_new = []
         bgrs_new = []
         for (fgr, bgr) in zip(fgrs, bgrs):
@@ -387,9 +504,9 @@ class Compose(object):
     def __init__(self, transforms):
         self.transforms = transforms
 
-    def __call__(self, fgrs, phas, bgrs, now_frames):
+    def __call__(self, fgrs, phas, bgrs):
         for t in self.transforms:            
-            fgrs, phas, bgrs = t(fgrs, phas, bgrs, now_frames)
+            fgrs, phas, bgrs = t(fgrs, phas, bgrs)
         return fgrs, phas, bgrs
 
     def __repr__(self):

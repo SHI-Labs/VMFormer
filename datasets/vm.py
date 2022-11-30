@@ -1,8 +1,16 @@
 # ------------------------------------------------------------------------
 # VMFormer data loader
 # ------------------------------------------------------------------------
-# Modified from SeqFormer (https://github.com/wjf5203/SeqFormer) and Deformable VisTR (https://github.com/Epiphqny/VisTR)
+# Modified from RVM (https://github.com/PeterL1n/RobustVideoMatting)
+# Copyright (c) 2021 ByteDance Inc. All Rights Reserved.
 # ------------------------------------------------------------------------
+# Modified from SeqFormer (https://github.com/wjf5203/SeqFormer)
+# Copyright (c) 2021 Junfeng Wu. All Rights Reserved.
+# ------------------------------------------------------------------------
+# Modified from Deformable DETR (https://github.com/fundamentalvision/Deformable-DETR)
+# Copyright (c) 2020 SenseTime. All Rights Reserved.
+# ------------------------------------------------------------------------
+
 from pathlib import Path
 
 import torch
@@ -42,13 +50,17 @@ class TrainFrameSampler:
 
 class VideoMatteDataset(Dataset):
     def __init__(self,
-                 videomatte_dir,
+                 imagematte_dir,
+                 lr_videomatte_dir,
+                 hr_videomatte_dir,
                  background_image_dir,
                  background_video_dir,
                  size,
                  seq_length,
                  seq_sampler,
                  transform=None):
+        self.imagematte_dir = imagematte_dir
+        self.imagematte_files = os.listdir(os.path.join(imagematte_dir, 'fgr'))
         self.background_image_dir = background_image_dir
         self.background_image_files = os.listdir(background_image_dir)
         self.background_video_dir = background_video_dir
@@ -56,20 +68,29 @@ class VideoMatteDataset(Dataset):
         self.background_video_frames = [sorted(os.listdir(os.path.join(background_video_dir, clip)))
                                         for clip in self.background_video_clips]
         
-        self.videomatte_dir = videomatte_dir
-        self.videomatte_clips = sorted(os.listdir(os.path.join(videomatte_dir, 'fgr')))
-        self.videomatte_frames = [sorted(os.listdir(os.path.join(videomatte_dir, 'fgr', clip))) 
-                                  for clip in self.videomatte_clips]
-        self.videomatte_idx = [(clip_idx, frame_idx) 
-                               for clip_idx in range(len(self.videomatte_clips)) 
-                               for frame_idx in range(0, len(self.videomatte_frames[clip_idx]), seq_length)]
+        self.lr_videomatte_dir = lr_videomatte_dir
+        self.lr_videomatte_clips = sorted(os.listdir(os.path.join(lr_videomatte_dir, 'fgr')))
+        self.lr_videomatte_frames = [sorted(os.listdir(os.path.join(lr_videomatte_dir, 'fgr', clip))) 
+                                  for clip in self.lr_videomatte_clips]
+        self.lr_videomatte_idx = [(clip_idx, frame_idx) 
+                               for clip_idx in range(len(self.lr_videomatte_clips)) 
+                               for frame_idx in range(0, len(self.lr_videomatte_frames[clip_idx]), seq_length)]
+        
+        self.hr_videomatte_dir = hr_videomatte_dir
+        self.hr_videomatte_clips = sorted(os.listdir(os.path.join(hr_videomatte_dir, 'fgr')))
+        self.hr_videomatte_frames = [sorted(os.listdir(os.path.join(hr_videomatte_dir, 'fgr', clip))) 
+                                  for clip in self.hr_videomatte_clips]
+        self.hr_videomatte_idx = [(clip_idx, frame_idx) 
+                               for clip_idx in range(len(self.hr_videomatte_clips)) 
+                               for frame_idx in range(0, len(self.hr_videomatte_frames[clip_idx]), seq_length)]
+        
         self.size = size
         self.seq_length = seq_length
         self.seq_sampler = seq_sampler
         self.transform = transform
 
     def __len__(self):
-        return len(self.videomatte_idx)
+        return len(self.lr_videomatte_idx)
 
     def __getitem__(self, idx):
         if random.random() < 0.5:
@@ -77,10 +98,15 @@ class VideoMatteDataset(Dataset):
         else:
             bgrs = self._get_random_video_background()
         
-        fgrs, phas = self._get_videomatte(idx)
-        
+        if random.random() < 0.2:
+            fgrs, phas = self._get_imagematte()
+        elif random.random() < 0.6:
+            fgrs, phas = self._get_lr_videomatte(idx)
+        else:
+            fgrs, phas = self._get_hr_videomatte(idx)
+
         if self.transform is not None:
-            fgrs, phas, bgrs = self.transform(fgrs, phas, bgrs, self.seq_length)
+            fgrs, phas, bgrs = self.transform(fgrs, phas, bgrs)
             imgs = []
             bgr_phas = []
             for (fgr, pha, bgr) in zip(fgrs, phas, bgrs):
@@ -92,6 +118,17 @@ class VideoMatteDataset(Dataset):
         #### torch.cat(imgs,dim=0) [self.seq_lengthx3, H, W]
         #### torch.cat(phas,dim=0) [self.seq_lengthx1, H, W]
     
+    def _get_imagematte(self):
+        img_file = random.choice(self.imagematte_files)
+        with Image.open(os.path.join(self.imagematte_dir, 'fgr', img_file)) as fgr, \
+             Image.open(os.path.join(self.imagematte_dir, 'pha', img_file)) as pha:
+                fgr = self._downsample_if_needed(fgr.convert('RGB'))
+                pha = self._downsample_if_needed(pha.convert('L'))
+
+        fgrs = [fgr] * self.seq_length
+        phas = [pha] * self.seq_length
+        return fgrs, phas
+
     def _get_random_image_background(self):
         with Image.open(os.path.join(self.background_image_dir, random.choice(self.background_image_files))) as bgr:
             bgr = self._downsample_if_needed(bgr.convert('RGB'))
@@ -112,15 +149,30 @@ class VideoMatteDataset(Dataset):
             bgrs.append(bgr)
         return bgrs
     
-    def _get_videomatte(self, idx):
-        clip_idx, frame_idx = self.videomatte_idx[idx]
-        clip = self.videomatte_clips[clip_idx]
-        frame_count = len(self.videomatte_frames[clip_idx])
+    def _get_lr_videomatte(self, idx):
+        clip_idx, frame_idx = self.lr_videomatte_idx[idx]
+        clip = self.lr_videomatte_clips[clip_idx]
+        frame_count = len(self.lr_videomatte_frames[clip_idx])
         fgrs, phas = [], []
         for i in self.seq_sampler(self.seq_length):
-            frame = self.videomatte_frames[clip_idx][(frame_idx + i) % frame_count]
-            with Image.open(os.path.join(self.videomatte_dir, 'fgr', clip, frame)) as fgr, \
-                 Image.open(os.path.join(self.videomatte_dir, 'pha', clip, frame)) as pha:
+            frame = self.lr_videomatte_frames[clip_idx][(frame_idx + i) % frame_count]
+            with Image.open(os.path.join(self.lr_videomatte_dir, 'fgr', clip, frame)) as fgr, \
+                 Image.open(os.path.join(self.lr_videomatte_dir, 'pha', clip, frame)) as pha:
+                    fgr = self._downsample_if_needed(fgr.convert('RGB'))
+                    pha = self._downsample_if_needed(pha.convert('L'))
+            fgrs.append(fgr)
+            phas.append(pha)
+        return fgrs, phas
+    
+    def _get_hr_videomatte(self, idx):
+        clip_idx, frame_idx = self.hr_videomatte_idx[idx]
+        clip = self.hr_videomatte_clips[clip_idx]
+        frame_count = len(self.hr_videomatte_frames[clip_idx])
+        fgrs, phas = [], []
+        for i in self.seq_sampler(self.seq_length):
+            frame = self.hr_videomatte_frames[clip_idx][(frame_idx + i) % frame_count]
+            with Image.open(os.path.join(self.hr_videomatte_dir, 'fgr', clip, frame)) as fgr, \
+                 Image.open(os.path.join(self.hr_videomatte_dir, 'pha', clip, frame)) as pha:
                     fgr = self._downsample_if_needed(fgr.convert('RGB'))
                     pha = self._downsample_if_needed(pha.convert('L'))
             fgrs.append(fgr)
@@ -140,6 +192,7 @@ def make_coco_transforms(image_set):
 
     normalize = T.Compose([
         T.ToTensor(),
+        T.MotionBlur(prob=0.1),
         T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
@@ -149,6 +202,7 @@ def make_coco_transforms(image_set):
         return T.Compose([
             T.RandomHorizontalFlip(),
             T.PhotometricDistort(),
+            T.RandomMotionAffine(prob=0.3),
             T.RandomSelect(
                 T.Compose([
                     T.RandomResize(scales, max_size=768),
@@ -177,9 +231,11 @@ def build(image_set, args):
     
     if args.dataset_file == 'vm':
         print('use VideoMatting dataset')
-        dataset = VideoMatteDataset(videomatte_dir='../data/Matting/VideoMatte240K_JPEG_SD/train',
-                                    background_image_dir='../data/Matting/BG20k/train',
-                                    background_video_dir='../data/Matting/BackgroundVideos/BackgroundVideosTrain/train',
+        dataset = VideoMatteDataset(imagematte_dir='/home/jiachenl/data/Matting/ImageMatte/train',
+                                    lr_videomatte_dir='/home/jiachenl/data/Matting/VideoMatte240K_JPEG_SD/train',
+                                    hr_videomatte_dir='/home/jiachenl/data/Matting/VideoMatte240K_JPEG_HD/train',
+                                    background_image_dir='/home/jiachenl/data/Matting/BG20k/train',
+                                    background_video_dir='/home/jiachenl/data/Matting/BackgroundVideos/BackgroundVideosTrain/train',
                                     size=512,
                                     seq_length=args.num_frames,
                                     seq_sampler=TrainFrameSampler(),

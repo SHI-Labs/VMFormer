@@ -14,8 +14,8 @@ Aug 25, 2022: [Codes](https://github.com/SHI-Labs/VMFormer) are released with [p
 
 ## Abstract
 
-Video matting aims to predict the alpha mattes for each frame from a given input video sequence. Recent solutions to video matting have been dominated by deep convolutional neural networks (CNN) for the past few years, which have become the de-facto standard for both academia and industry. 
-However, they have inbuilt inductive bias of locality and do not capture global characteristics of an image due to the CNN-based architectures. They also lack long range temporal modeling considering computational costs when dealing with feature maps of multiple frames. In this paper, we propose <b>VMFormer</b>: a transformer-based end-to-end method for video matting. It makes predictions on alpha mattes of each frame from learnable queries given a video input sequence. Specifically, it leverages self-attention layers to build global integration of feature sequences with short-range temporal modeling on successive frames. We further apply queries to learn global representations through cross-attention in the transformer decoder with long-range temporal modeling upon all queries. In the prediction stage, both queries and corresponding feature maps are used to make the final prediction of alpha matte. Experiments show that VMFormer outperforms previous CNN-based video matting methods on the composited benchmarks. To our best knowledge, it is the first end-to-end video matting solution built upon a full vision transformer with predictions on the learnable queries.
+Video matting aims to predict the alpha mattes for each frame from a given input video sequence. Recent solutions to video matting have been dominated by deep convolutional neural networks (CNN) for the past few years, which have become the de-facto standard for academia and industry. 
+However, they have the inbuilt inductive bias of locality and do not capture the global characteristics of an image due to the CNN-based architectures. They also need long-range temporal modeling considering computational costs when dealing with feature maps of multiple frames. In this paper, we propose <b>VMFormer</b>: a transformer-based end-to-end method for video matting. It makes predictions on alpha mattes of each frame from learnable queries given a video input sequence. Specifically, it leverages self-attention layers to build global integration of feature sequences with short-range temporal modeling on successive frames. We further apply queries to learn global representations through cross-attention in the transformer decoder with long-range temporal modeling upon all queries. In the prediction stage, both queries and corresponding feature maps are used to make the final prediction of alpha matte. Experiments show that VMFormer outperforms previous CNN-based video matting methods on the composited benchmarks. To the best knowledge, it is the first end-to-end video matting solution built upon a full vision transformer with predictions on the learnable queries
 
 ## Architecture
 
@@ -42,9 +42,10 @@ See [Installation Instructions](INSTALL.md).
 See [Getting Started](GETTING_STARTED.md).
 
 ## Model Zoo
-| Model                                                        | MAD   | MSE | Grad | Conn  | dtSSD |
-| ------------------------------------------------------------ | ---- | ---- | ---- | ---- | ---- |
-| VMFormer [[google drive]](https://drive.google.com/file/d/1q2Rm-Rp42bQA4zIbCqPzJ9GG6P7SQGmq/view?usp=sharing) | 5.91 | 1.21 | 0.76 | 0.39 | 1.90 |
+| Model                                                        | MAD   | MSE | Grad | Conn |
+| ------------------------------------------------------------ | ---- | ---- | ---- | ---- | 
+| 512x288: VMFormer [[google drive]](https://drive.google.com/file/d/1q2Rm-Rp42bQA4zIbCqPzJ9GG6P7SQGmq/view?usp=sharing) | 4.91 | 0.55 | 0.40 | 0.25 |
+| 1920x1080: VMFormer [[google drive]](https://drive.google.com/file/d/1q2Rm-Rp42bQA4zIbCqPzJ9GG6P7SQGmq/view?usp=sharing) | 4.81 | 0.78 | 4.90 | 3.34 |
 
 # To do List
 - [x] PyTorch codes release
@@ -65,4 +66,4 @@ See [Getting Started](GETTING_STARTED.md).
 
 ## Acknowledgement
 
-This repo is based on [Deformable DETR](https://github.com/fundamentalvision/Deformable-DETR) and [SeqFormer](https://github.com/wjf5203/SeqFormer). Thanks for their open-sourced works.
+This repo is based on [Deformable DETR](https://github.com/fundamentalvision/Deformable-DETR), [SeqFormer](https://github.com/wjf5203/SeqFormer) and [RVM](https://github.com/PeterL1n/RobustVideoMatting). Thanks for their open-sourced works.

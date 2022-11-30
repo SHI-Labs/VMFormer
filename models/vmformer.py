@@ -10,6 +10,7 @@
 # Modified from DETR (https://github.com/facebookresearch/detr)
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 # ------------------------------------------------------------------------
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -25,7 +26,6 @@ from .backbone import build_backbone
 from .deformable_vm import build_deforamble_vm
 from .loss import dice_loss, sigmoid_focal_loss, l1_loss, laplacian_loss, temporal_loss
 import copy
-import pdb
 
 def _get_clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
@@ -269,10 +269,15 @@ class SetCriterion(nn.Module):
         for i, out_src_mask in enumerate(out_src_masks):
             out_src_mask = interpolate(out_src_mask, size=target_masks.shape[-2:], mode="bilinear", align_corners=False)
             out_src_mask  = out_src_mask.reshape(bs, num_frames, -1, out_src_mask.shape[-2], out_src_mask.shape[-1])
+            #losses.update({
+            #    "loss_l1"+f'_{i}': l1_loss(out_src_mask, target_masks),
+            #    "loss_lap"f'_{i}': laplacian_loss(out_src_mask, target_masks),
+            #    "loss_temporal"f'_{i}': temporal_loss(out_src_mask, target_masks)
+            #})
             losses.update({
-                "loss_mask"+f'_{i}': sigmoid_focal_loss(out_src_mask.flatten(1), target_masks.flatten(1)),
-                "loss_dice"f'_{i}': dice_loss(out_src_mask.flatten(1), target_masks.flatten(1)),
-                "loss_temporal"f'_{i}': temporal_loss(out_src_mask.sigmoid(), target_masks.sigmoid())
+                "loss_mask"+f'_{i}': sigmoid_focal_loss(out_src_mask, target_masks),
+                "loss_dice"f'_{i}': dice_loss(out_src_mask, target_masks),
+                "loss_temporal"f'_{i}': temporal_loss(out_src_mask, target_masks)
             })
         return losses
 
@@ -299,6 +304,17 @@ class SetCriterion(nn.Module):
                     losses.update(l_dict)
         return losses
 
+class ConvTmp(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.tmp_conv = torch.nn.Conv2d(dim, dim, 1, 1, 0)
+        self.cur_conv = torch.nn.Conv2d(dim, dim, 1, 1, 0)
+        self.ac = nn.Tanh()
+
+    def forward(self, tmp_f, cur_f):
+        tmp = self.ac(self.tmp_conv(tmp_f) + self.cur_conv(cur_f))
+        return tmp, tmp
+
 class MaskHeadSmallConv(nn.Module):
     """
     Simple convolutional head, using group norm.
@@ -314,9 +330,9 @@ class MaskHeadSmallConv(nn.Module):
         self.fpn_temporal = fpn_temporal
         
         if self.fpn_temporal:
-            self.temporal4 = torch.nn.Conv2d(context_dim//2, context_dim//2, 1, 1, 0)
-            self.temporal3 = torch.nn.Conv2d(context_dim//2, context_dim//2, 1, 1, 0)
-            self.temporal2 = torch.nn.Conv2d(context_dim//2, context_dim//2, 1, 1, 0)
+            self.temporal4 = ConvTmp(context_dim//2)
+            self.temporal3 = ConvTmp(context_dim//2)
+            self.temporal2 = ConvTmp(context_dim//2)
 
         self.large_feature = large_feature
             
@@ -340,46 +356,51 @@ class MaskHeadSmallConv(nn.Module):
         out = []
         if self.fpn_temporal:
             current_tmp_feature = []
+
         fused_x = x[-1]
-        if self.fpn_temporal and tmp_feature is not None:
-            fused_x_a, fused_x_r = fused_x.split(self.context_dim // 2, dim=1)
-            tmp_f = tmp_feature[0]
-            fused_x_r = tmp_f + fused_x_r
-            fused_x_r = self.temporal4(fused_x_r)
-            fused_x = torch.cat([fused_x_a, fused_x_r], dim=1)
-        fused_x = self.lay4(fused_x)
-        fused_x = F.relu(fused_x)
+        
         if self.fpn_temporal:
             fused_x_a, fused_x_r = fused_x.split(self.context_dim // 2, dim=1)
-            current_tmp_feature.append(fused_x_r)
+            if tmp_feature is not None:
+                tmp_f = tmp_feature[0]
+                tmp_f_update, fused_x_r = self.temporal4(tmp_f, fused_x_r)
+                fused_x = torch.cat([fused_x_a, fused_x_r], dim=1)
+            else:
+                tmp_f_update = fused_x_r
+            current_tmp_feature.append(tmp_f_update)
+        
+        fused_x = self.lay4(fused_x)
+        fused_x = F.relu(fused_x)
 
         fused_x = x[-2] + F.interpolate(fused_x, size=x[-2].shape[-2:], mode="bilinear", align_corners=False)
-        if self.fpn_temporal and tmp_feature is not None:
+        
+        if self.fpn_temporal:
             fused_x_a, fused_x_r = fused_x.split(self.context_dim // 2, dim=1)
-            tmp_f = tmp_feature[1]
-            fused_x_r = tmp_f + fused_x_r
-            fused_x_r = self.temporal3(fused_x_r)
-            fused_x = torch.cat([fused_x_a, fused_x_r], dim=1)
+            if tmp_feature is not None:
+                tmp_f = tmp_feature[1]
+                tmp_f_update, fused_x_r = self.temporal3(tmp_f, fused_x_r)
+                fused_x = torch.cat([fused_x_a, fused_x_r], dim=1)
+            else:
+                tmp_f_update = fused_x_r
+            current_tmp_feature.append(tmp_f_update)
 
         fused_x = self.lay3(fused_x)
         fused_x = F.relu(fused_x)
-        if self.fpn_temporal:
-            fused_x_a, fused_x_r = fused_x.split(self.context_dim // 2, dim=1)
-            current_tmp_feature.append(fused_x_r)
 
         fused_x = x[-3] + F.interpolate(fused_x, size=x[-3].shape[-2:], mode="bilinear", align_corners=False)
-        if self.fpn_temporal and tmp_feature is not None:
-            fused_x_a, fused_x_r = fused_x.split(self.context_dim // 2, dim=1)
-            tmp_f = tmp_feature[2]
-            fused_x_r = tmp_f + fused_x_r
-            fused_x_r = self.temporal2(fused_x_r)
-            fused_x = torch.cat([fused_x_a, fused_x_r], dim=1)
         
-        fused_x = self.lay2(fused_x)
-        fused_x = F.relu(fused_x)
         if self.fpn_temporal:
             fused_x_a, fused_x_r = fused_x.split(self.context_dim // 2, dim=1)
-            current_tmp_feature.append(fused_x_r)
+            if tmp_feature is not None:
+                tmp_f = tmp_feature[2]
+                tmp_f_update, fused_x_r = self.temporal2(tmp_f, fused_x_r)
+                fused_x = torch.cat([fused_x_a, fused_x_r], dim=1)
+            else:
+                tmp_f_update = fused_x_r
+            current_tmp_feature.append(tmp_f_update)
+            
+        fused_x = self.lay2(fused_x)
+        fused_x = F.relu(fused_x)
 
         if self.large_feature:
             fused_x = self.proj(largef) + F.interpolate(fused_x, size=largef.shape[-2:], mode="bilinear", align_corners=False)
@@ -418,7 +439,7 @@ def build_vm(args):
     
     if args.aux_loss:
         aux_weight_dict = {}
-        for i in range(4):
+        for i in range(1):
             aux_weight_dict.update({k + f'_{i}': v for k, v in weight_dict.items()})
         weight_dict.update(aux_weight_dict)
 
