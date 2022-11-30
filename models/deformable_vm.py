@@ -216,6 +216,8 @@ class DeformableTransformerDecoderLayer(nn.Module):
                 self.time_attention_weights = nn.Linear(d_model, 1)
             elif self.query_temporal == 'weight_sum_all':
                 self.time_attention_weights = nn.Linear(d_model, d_model)
+            elif self.query_temporal == 'selfatt':
+                self.time_attention_weights = nn.MultiheadAttention(d_model, n_heads, dropout=dropout)
 
     @staticmethod
     def with_pos_embed(tensor, pos):
@@ -259,10 +261,13 @@ class DeformableTransformerDecoderLayer(nn.Module):
             time_weight = self.time_attention_weights(tgt2)
             time_weight = F.softmax(time_weight, 1)
             tgt_temporal = (tgt2*time_weight).sum(1).unsqueeze(1)
-
+        elif self.query_temporal == 'selfatt':
+            tgt_temporal = self.time_attention_weights(tgt2.flatten(0, 1).transpose(0, 1), tgt2.flatten(0, 1).transpose(0, 1), tgt2.flatten(0, 1).transpose(0, 1))[0].transpose(0, 1)
+            tgt_temporal = tgt_temporal.unflatten(0, (N, nf))
+        
         if len(tgt.shape) == 3: 
             tgt = tgt.unsqueeze(1) + self.dropout1(tgt2)
-        elif self.query_temporal == 'weight_sum' or self.query_temporal == 'weight_sum_all':
+        elif self.query_temporal is not None:
             tgt = tgt + self.dropout1(tgt2) + self.dropout_tem(tgt_temporal)
         else:
             tgt = tgt + self.dropout1(tgt2)

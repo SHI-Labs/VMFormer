@@ -24,6 +24,7 @@ def temporal_loss(inputs, targets):
         targets: A float tensor with the same shape as inputs. Stores the binary
                  classification label for each element in inputs
     """
+    inputs = inputs.sigmoid()
     return F.mse_loss(inputs[:, 1:] - inputs[:, :-1], targets[:, 1:] - targets[:, :-1])
 
 def l1_loss(inputs, targets):
@@ -35,6 +36,7 @@ def l1_loss(inputs, targets):
         targets: A float tensor with the same shape as inputs. Stores the binary
                  classification label for each element in inputs
     """
+    inputs = (torch.tanh(inputs) + 1.0) / 2.0
     return F.l1_loss(inputs, targets)
 
 def dice_loss(inputs, targets):
@@ -48,9 +50,8 @@ def dice_loss(inputs, targets):
                 (0 for the negative class and 1 for the positive class).
     """
     inputs = inputs.sigmoid()
-    inputs = inputs.flatten(1)
-    numerator = 2 * (inputs * targets).sum(1)
-    denominator = inputs.sum(-1) + targets.sum(-1)
+    numerator = 2 * (inputs * targets).sum()
+    denominator = inputs.sum() + targets.sum()
     loss = 1 - (numerator + 1) / (denominator + 1)
     return loss.sum()
 
@@ -103,12 +104,13 @@ def sigmoid_focal_loss(inputs, targets, alpha: float = 0.25, gamma: float = 2):
         alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
         loss = alpha_t * loss
 
-    return loss.mean(1).sum()
+    return loss.mean()
 
 def laplacian_loss(pred, true, max_levels=5):
+    pred = (torch.tanh(pred) + 1.0) / 2.0
     kernel = gauss_kernel(device=pred.device, dtype=pred.dtype)
-    pred_pyramid = laplacian_pyramid(pred, kernel, max_levels)
-    true_pyramid = laplacian_pyramid(true, kernel, max_levels)
+    pred_pyramid = laplacian_pyramid(pred.flatten(0,1), kernel, max_levels)
+    true_pyramid = laplacian_pyramid(true.flatten(0,1), kernel, max_levels)
     loss = 0
     for level in range(max_levels):
         loss += (2 ** level) * F.l1_loss(pred_pyramid[level], true_pyramid[level])
