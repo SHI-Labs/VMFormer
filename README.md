@@ -44,8 +44,8 @@ See [Getting Started](GETTING_STARTED.md).
 ## Model Zoo
 | Model                                                        | MAD   | MSE | Grad | Conn |
 | ------------------------------------------------------------ | ---- | ---- | ---- | ---- | 
-| 512x288: VMFormer [[google drive]](https://drive.google.com/file/d/1q2Rm-Rp42bQA4zIbCqPzJ9GG6P7SQGmq/view?usp=sharing) | 4.91 | 0.55 | 0.40 | 0.25 |
-| 1920x1080: VMFormer [[google drive]](https://drive.google.com/file/d/1q2Rm-Rp42bQA4zIbCqPzJ9GG6P7SQGmq/view?usp=sharing) | 4.81 | 0.78 | 4.90 | 3.34 |
+| 512x288: VMFormer [[google drive]](https://drive.google.com/file/d/18oJUcRtEUa6qzaTnmrOdfvKzuOQe0oEF/view) | 4.91 | 0.55 | 0.40 | 0.25 |
+| 1920x1080: VMFormer [[google drive]](https://drive.google.com/file/d/18oJUcRtEUa6qzaTnmrOdfvKzuOQe0oEF/view) | 4.81 | 0.78 | 4.90 | 3.34 |
 
 # To do List
 - [x] PyTorch codes release
